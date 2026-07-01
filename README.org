@@ -1,0 +1,4 @@
+#+TITLE: Make a Lisp in OCaml
+#+DATE: 01/07/2026
+
+Writing a simple lisp interpreter in OCaml from [[https://bernsteinbear.com/blog/lisp/][Max Bernstein's Writing a Lisp series]].

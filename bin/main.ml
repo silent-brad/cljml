@@ -1,5 +1,8 @@
 (* Make a Lisp *)
 
+exception SyntaxError of string
+exception ThisCan'tHappenError
+
 type stream =
   { mutable line_num : int
   ; mutable chr : char list
@@ -30,8 +33,14 @@ type lobject =
   | Fixnum of int
   | Boolean of bool
   | Symbol of string
+  | Nil
+  | Pair of lobject * lobject
 
-exception SyntaxError of string
+let rec pair_to_list pr =
+  match pr with
+  | Nil -> []
+  | Pair (a, b) -> a :: pair_to_list b
+  | _ -> raise ThisCan'tHappenError
 
 let string_of_char c = String.make 1 c
 
@@ -67,10 +76,23 @@ let rec read_sexp stm =
       "")
     else string_of_char nc ^ read_symbol ()
   in
+  let rec read_list stm =
+    eat_whitespace stm;
+    let c = read_char stm in
+    if c = ')'
+    then Nil
+    else (
+      let _ = unread_char stm c in
+      let car = read_sexp stm in
+      let cdr = read_list stm in
+      Pair (car, cdr))
+  in
   eat_whitespace stm;
   let c = read_char stm in
   if is_symstartchar c
   then Symbol (string_of_char c ^ read_symbol ())
+  else if c = '('
+  then read_list stm
   else if is_digit c || c = '~'
   then read_fixnum (Char.escaped (if c = '~' then '-' else c))
   else if c = '#'
@@ -81,11 +103,30 @@ let rec read_sexp stm =
     | x -> raise (SyntaxError ("Invalid boolean literal " ^ Char.escaped x)))
   else raise (SyntaxError ("Unexpected char " ^ Char.escaped c))
 
-let print_sexp e =
+let rec print_sexp e =
+  let rec is_list e =
+    match e with Nil -> true | Pair (a, b) -> is_list b | _ -> false
+  in
+  let rec print_list l =
+    match l with
+    | Pair (a, Nil) -> print_sexp a
+    | Pair (a, b) -> print_sexp a; print_string " "; print_list b
+    | _ -> raise ThisCan'tHappenError
+  in
+  let print_pair p =
+    match p with
+    | Pair (a, b) -> print_sexp a; print_string ". "; print_sexp b
+    | _ -> raise ThisCan'tHappenError
+  in
   match e with
   | Fixnum v -> print_int v
   | Boolean b -> print_string (if b then "#t" else "#f")
   | Symbol s -> print_string s
+  | Nil -> print_string "nil"
+  | Pair (a, b) ->
+    print_string "(";
+    if is_list e then print_list e else print_pair e;
+    print_string ")"
 
 let rec repl stm =
   print_string "> ";
