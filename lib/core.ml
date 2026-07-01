@@ -30,6 +30,9 @@ let rec pair_to_list pr =
   | Pair (a, b) -> a :: pair_to_list b
   | _ -> raise ThisCan'tHappenError
 
+let rec is_list e =
+  match e with Nil -> true | Pair (a, b) -> is_list b | _ -> false
+
 let rec eval_sexp sexp env =
   let eval_if cond iftrue iffalse =
     let condval, _ = eval_sexp cond env in
@@ -41,9 +44,17 @@ let rec eval_sexp sexp env =
   match sexp with
   | Fixnum v -> Fixnum v, env
   | Boolean v -> Boolean v, env
-  | Symbol v -> Symbol v, env
+  | Symbol name -> lookup (name, env), env
   | Nil -> Nil, env
-  | Pair (Symbol "if", Pair (cond, Pair (iftrue, Pair (iffalse, Nil)))) ->
-    let expval, _ = eval_sexp (eval_if cond iftrue iffalse) env in
-    expval, env
+  | Pair (_, _) when is_list sexp ->
+    (match pair_to_list sexp with
+     | [ Symbol "if"; cond; iftrue; iffalse ] ->
+       eval_sexp (eval_if cond iftrue iffalse) env
+     | [ Symbol "pair"; car; cdr ] -> Pair (car, cdr), env
+     | [ Symbol "env" ] -> env, env
+     | [ Symbol "val"; Symbol name; exp ] ->
+       let expval, _ = eval_sexp exp env in
+       let env' = bind (name, expval, env) in
+       expval, env'
+     | _ -> sexp, env)
   | _ -> sexp, env

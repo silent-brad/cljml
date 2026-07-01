@@ -86,12 +86,6 @@ let rec read_sexp stm =
   else raise (Core.SyntaxError ("Unexpected char " ^ Char.escaped c))
 
 let rec print_sexp e =
-  let rec is_list e =
-    match e with
-    | Core.Nil -> true
-    | Core.Pair (a, b) -> is_list b
-    | _ -> false
-  in
   let rec print_list l =
     match l with
     | Core.Pair (a, Nil) -> print_sexp a
@@ -110,7 +104,7 @@ let rec print_sexp e =
   | Core.Nil -> print_string "nil"
   | Core.Pair (a, b) ->
     print_string "(";
-    if is_list e then print_list e else print_pair e;
+    if Core.is_list e then print_list e else print_pair e;
     print_string ")"
 
 let rec repl stm env =
