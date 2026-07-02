@@ -89,6 +89,8 @@ let rec read_sexp stm =
   else
     raise (Core.SyntaxError ("Unexpected char " ^ Char.escaped c))
 
+let spacesep ns = String.concat " " ns
+
 let rec string_exp = function
   | Core.Literal e -> string_val e
   | Core.Var n -> n
@@ -100,7 +102,10 @@ let rec string_exp = function
   | Core.Call (f, es) ->
     let string_es = String.concat " " (List.map string_exp es) in
     "(" ^ string_exp f ^ " " ^ string_es ^ ")"
+  | Core.Lambda (ns, e) -> "#<lambda>"
   | Core.Defexp (Val (n, e)) -> "(val " ^ n ^ " " ^ string_exp e ^ ")"
+  | Defexp (Def (n, ns, e)) ->
+    "(fn " ^ n ^ "(" ^ spacesep ns ^ ") " ^ string_exp e ^ ")"
   | Core.Defexp (Exp e) -> string_exp e
 
 and string_val e =
@@ -124,30 +129,7 @@ and string_val e =
     "(" ^ (if is_list e then string_list e else string_pair e) ^ ")"
   | Core.Primitive (name, _) -> "#<primitive:" ^ name ^ ">"
   | Core.Quote v -> "'" ^ string_val v
-
-(* let rec print_val e = *)
-(*   let rec print_list l = *)
-(*     match l with *)
-(*     | Core.Pair (a, Nil) -> print_val a *)
-(*     | Core.Pair (a, b) -> print_val a; print_string " "; print_list b *)
-(*     | _ -> raise Core.ThisCan'tHappenError *)
-(*   in *)
-(*   let print_pair p = *)
-(*     match p with *)
-(*     | Core.Pair (a, b) -> print_val a; print_string ". "; print_val b *)
-(*     | _ -> raise Core.ThisCan'tHappenError *)
-(*   in *)
-(*   match e with *)
-(*   | Core.Fixnum v -> print_int v *)
-(*   | Core.Boolean b -> print_string (if b then "#t" else "#f") *)
-(*   | Core.Symbol s -> print_string s *)
-(*   | Core.Nil -> print_string "nil" *)
-(*   | Core.Pair (a, b) -> *)
-(*     print_string "("; *)
-(*     if Core.is_list e then print_list e else print_pair e; *)
-(*     print_string ")" *)
-(*   | Primitive (name, _) -> print_string ("#<primitive:" ^ name ^ ">") *)
-(*   | Quote v -> "'" ^ string_val v *)
+  | Closure (ns, e, _) -> "#<closure>"
 
 let rec repl stm env =
   print_string "> ";
