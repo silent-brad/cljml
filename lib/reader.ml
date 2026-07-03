@@ -1,24 +1,38 @@
 open Types
+open Lwt.Syntax
+
+let mkstream is_stdin stm = { chr = []; line_num = 1; is_stdin; stm }
+let mkstringstream s = mkstream false (Lwt_stream.of_string s)
+
+let mkfilestream f =
+  if f = stdin then (
+    let get () = Lwt_io.read_char_opt Lwt_io.stdin in
+    mkstream true (Lwt_stream.from get))
+  else
+    mkstream false (Lwt_stream.of_string (In_channel.input_all f))
 
 let read_char stm =
   match stm.chr with
   | [] ->
-    let c = input_char stm.chan in
-    if c = '\n' then (
-      let _ = stm.line_num <- stm.line_num + 1 in
-      c)
-    else
-      c
+    let* c = Lwt_stream.get stm.stm in
+    (match c with
+     | None -> Lwt.fail End_of_file
+     | Some c ->
+       if c = '\n' then (
+         stm.line_num <- stm.line_num + 1;
+         Lwt.return c)
+       else
+         Lwt.return c)
   | c :: rest ->
-    let _ = stm.chr <- rest in
-    c
+    stm.chr <- rest;
+    Lwt.return c
 
 let unread_char stm c = stm.chr <- c :: stm.chr
 let is_white c = c = ' ' || c = '\t' || c = '\n'
 
 let rec eat_whitespace stm =
-  let c = read_char stm in
-  if is_white c then eat_whitespace stm else unread_char stm c
+  let* c = read_char stm in
+  if is_white c then eat_whitespace stm else Lwt.return (unread_char stm c)
 
 let string_of_char c = String.make 1 c
 
@@ -28,12 +42,12 @@ let rec read_sexp stm =
     code >= Char.code '0' && code <= Char.code '9'
   in
   let rec read_fixnum acc =
-    let nc = read_char stm in
+    let* nc = read_char stm in
     if is_digit nc then
       read_fixnum (acc ^ Char.escaped nc)
     else (
-      let _ = unread_char stm nc in
-      Fixnum (int_of_string acc))
+      unread_char stm nc;
+      Lwt.return (Fixnum (int_of_string acc)))
   in
   let is_symstartchar =
     let is_alpha = function 'A' .. 'Z' | 'a' .. 'z' -> true | _ -> false in
@@ -47,45 +61,49 @@ let rec read_sexp stm =
       | c when c = '"' -> true
       | c -> is_white c
     in
-    let nc = read_char stm in
+    let* nc = read_char stm in
     if is_delimiter nc then (
-      let _ = unread_char stm nc in
-      "")
+      unread_char stm nc; Lwt.return "")
     else
-      string_of_char nc ^ read_symbol ()
+      let* rest = read_symbol () in
+      Lwt.return (string_of_char nc ^ rest)
   in
   let rec read_list stm =
-    eat_whitespace stm;
-    let c = read_char stm in
+    let* () = eat_whitespace stm in
+    let* c = read_char stm in
     if c = ')' then
-      Nil
+      Lwt.return Nil
     else (
-      let _ = unread_char stm c in
-      let car = read_sexp stm in
-      let cdr = read_list stm in
-      Pair (car, cdr))
+      unread_char stm c;
+      let* car = read_sexp stm in
+      let* cdr = read_list stm in
+      Lwt.return (Pair (car, cdr)))
   in
   let rec eat_comment stm =
-    if read_char stm = '\n' then () else eat_comment stm
+    let* c = read_char stm in
+    if c = '\n' then Lwt.return () else eat_comment stm
   in
-  eat_whitespace stm;
-  let c = read_char stm in
-  if c = ';' then (
-    eat_comment stm; read_sexp stm)
+  let* () = eat_whitespace stm in
+  let* c = read_char stm in
+  if c = ';' then
+    let* () = eat_comment stm in
+    read_sexp stm
   else if is_symstartchar c then
-    Symbol (string_of_char c ^ read_symbol ())
+    let* sym = read_symbol () in
+    Lwt.return (Symbol (string_of_char c ^ sym))
   else if c = '(' then
     read_list stm
   else if is_digit c || c = '~' then
     read_fixnum (Char.escaped (if c = '~' then '-' else c))
-  else if c = '#' then (
-    match
-      read_char stm
-    with
-    | 't' -> Boolean true
-    | 'f' -> Boolean false
-    | x -> raise @@ SyntaxError ("Invalid boolean literal " ^ Char.escaped x))
+  else if c = '#' then
+    let* x = read_char stm in
+    match x with
+    | 't' -> Lwt.return (Boolean true)
+    | 'f' -> Lwt.return (Boolean false)
+    | x ->
+      Lwt.fail @@ SyntaxError ("Invalid boolean literal " ^ Char.escaped x)
   else if c = '\'' then
-    Quote (read_sexp stm)
+    let* e = read_sexp stm in
+    Lwt.return (Quote e)
   else
-    raise @@ SyntaxError ("Unexpected char " ^ Char.escaped c)
+    Lwt.fail @@ SyntaxError ("Unexpected char " ^ Char.escaped c)

@@ -1,2 +1,3 @@
 (library
- (name mal))
+ (name mal)
+ (libraries lwt lwt.unix))

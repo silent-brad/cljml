@@ -1,17 +1,34 @@
 open Mal.Core
+open Lwt.Syntax
 
 let rec repl stm env =
-  if stm.chan = stdin then (
-    print_string "> "; flush stdout);
-  let ast = build_ast (read_sexp stm) in
+  let* () =
+    if stm.is_stdin then (
+      print_string "> "; flush stdout; Lwt.return ())
+    else
+      Lwt.return ()
+  in
+  let* sexp = read_sexp stm in
+  let ast = build_ast sexp in
   let result, env' = eval ast env in
-  if stm.chan = stdin then
-    print_endline (string_val result);
+  let* () =
+    if stm.is_stdin then (
+      print_endline (string_val result);
+      Lwt.return ())
+    else
+      Lwt.return ()
+  in
   repl stm env'
 
 let get_ic () = try open_in Sys.argv.(1) with Invalid_argument s -> stdin
 
 let main =
   let ic = get_ic () in
-  let stm = { chr = []; line_num = 1; chan = ic } in
-  try repl stm basis with End_of_file -> if ic <> stdin then close_in ic
+  Lwt_main.run
+    (Lwt.catch
+       (fun () -> repl (mkfilestream ic) stdlib)
+       (function
+         | End_of_file ->
+           if ic <> stdin then close_in ic;
+           Lwt.return ()
+         | e -> Lwt.fail e))

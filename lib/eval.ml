@@ -44,7 +44,11 @@ let rec evalexp exp env =
       evalexp body env'
     | Defexp d -> raise ThisCan'tHappenError
   in
-  ev exp
+  try ev exp with
+  | e ->
+    let err = Printexc.to_string e in
+    print_endline @@ "Error: " ^ err ^ " in expression " ^ string_exp exp;
+    raise e
 
 let evaldef def env =
   match def with

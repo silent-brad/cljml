@@ -11,7 +11,8 @@ type 'a env = (string * 'a option ref) list
 type stream =
   { mutable line_num : int
   ; mutable chr : char list
-  ; chan : in_channel
+  ; is_stdin : bool
+  ; stm : char Lwt_stream.t
   }
 
 type lobject =

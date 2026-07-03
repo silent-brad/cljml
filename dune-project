@@ -14,4 +14,4 @@
 (package
  (name mal)
  (synopsis "Make a Lisp in OCaml")
- (depends ocaml lisp mal))
+ (depends ocaml lwt mal))

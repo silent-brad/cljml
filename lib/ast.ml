@@ -11,7 +11,7 @@ let rec build_ast sexp =
     | [] -> Literal (Symbol "error")
     | Pair (cond, Pair (res, Nil)) :: condpairs ->
       If (build_ast cond, build_ast res, cond_to_if condpairs)
-    | _ -> raise @@ TypeError "(cond conditions)"
+    | _ -> raise @@ TypeError "(cond c0 c1 c2 c3 ...)"
   in
   let let_kinds = [ "let", LET; "let*", LETSTAR; "letrec", LETREC ] in
   let valid_let s = List.mem_assoc s let_kinds in

@@ -8,7 +8,7 @@ bug-reports: "https://github.com/silent-brad/mal/issues"
 depends: [
   "dune" {>= "3.21"}
   "ocaml"
-  "lisp"
+  "lwt"
   "mal"
   "odoc" {with-doc}
 ]
