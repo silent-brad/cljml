@@ -55,16 +55,6 @@ let evaldef def env =
   | Val (n, e) ->
     let v = evalexp e env in
     v, bind (n, v, env)
-  | Def (n, ns, e) ->
-    let formals, body, cl_env =
-      match evalexp (Lambda (ns, e)) env with
-      | Closure (fs, bod, env) -> fs, bod, env
-      | _ -> raise @@ TypeError "Expecting closure"
-    in
-    let loc = mkloc () in
-    let clo = Closure (formals, body, bindloc (n, loc, cl_env)) in
-    let () = loc := Some clo in
-    clo, bindloc (n, loc, env)
   | Exp e -> evalexp e env, env
 
 let rec eval ast env =

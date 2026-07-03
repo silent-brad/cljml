@@ -47,5 +47,4 @@ and exp =
 
 and def =
   | Val of name * exp
-  | Def of name * name list * exp
   | Exp of exp

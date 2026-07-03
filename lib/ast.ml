@@ -48,8 +48,10 @@ let rec build_ast sexp =
        let names =
          List.map (function Symbol s -> s | _ -> err ()) (pair_to_list ns)
        in
-       Defexp (Def (n, names, build_ast e))
-     | [ Symbol "apply"; fnexp; args ] when is_list args ->
+       let () = assert_unique names in
+       let lam = Lambda (names, build_ast e) in
+       Defexp (Val (n, Let (LETREC, [ n, lam ], Var n)))
+     | [ Symbol "apply"; fnexp; args ] ->
        Apply (build_ast fnexp, build_ast args)
      | fnexp :: args -> Call (build_ast fnexp, List.map build_ast args)
      | [] -> raise @@ ParseError "poorly formed expression")

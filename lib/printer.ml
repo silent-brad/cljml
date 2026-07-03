@@ -46,6 +46,4 @@ let rec string_exp =
     let bindings = spacesep (List.map string_of_binding bs) in
     "(" ^ str ^ " (" ^ bindings ^ ") " ^ string_exp e ^ ")"
   | Defexp (Val (n, e)) -> "(val " ^ n ^ " " ^ string_exp e ^ ")"
-  | Defexp (Def (n, ns, e)) ->
-    "(fn " ^ n ^ "(" ^ spacesep ns ^ ") " ^ string_exp e ^ ")"
   | Defexp (Exp e) -> string_exp e
