@@ -14,6 +14,12 @@
   (let [ok (print s)]
     (print newline)))
 
+(macro when (cond body)
+  `(if ,cond ,body))
+
+(macro unless (cond body)
+  `(if ,cond nil ,body))
+
 (fn getline ()
   (let [ic (getchar)
         c (itoc ic)]

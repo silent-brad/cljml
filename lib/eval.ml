@@ -2,6 +2,59 @@ open Types
 open Env
 open Printer
 open Reader
+open Ast
+
+let rec macro_expand env sexp =
+  let rec qq = function
+    | Pair (Symbol "unquote", Pair (e, Nil)) -> macro_expand env e
+    | Pair (Symbol "unquote-splicing", _) ->
+      raise (SyntaxError "splice must be inside a list")
+    | Pair (a, b) when is_list (Pair (a, b)) ->
+      qq_list (pair_to_list (Pair (a, b)))
+    | other -> other
+  and qq_list = function
+    | [] -> Nil
+    | Pair (Symbol "unquote-splicing", Pair (e, Nil)) :: rest ->
+      (match macro_expand env e with
+       | Nil -> qq_list rest
+       | Pair _ as lst when is_list lst ->
+         let elems = pair_to_list lst in
+         List.fold_right (fun x acc -> Pair (x, acc)) elems (qq_list rest)
+       | _ -> raise (SyntaxError "splice must be a list"))
+    | x :: xs -> Pair (qq x, qq_list xs)
+  in
+  match sexp with
+  | Pair (Symbol "quote", _) -> sexp
+  | Pair (Symbol "quasiquote", Pair (e, Nil)) ->
+    let expanded = qq e in
+    macro_expand env expanded
+  | Pair (Symbol "macro", _) -> sexp
+  | Pair (Symbol name, args) when is_list args ->
+    (try
+       match lookup (name, env) with
+       | Macro (ns, template, menv) ->
+         let arg_list = pair_to_list args in
+         let expanded_template = subst ns arg_list template in
+         let result = macro_expand menv expanded_template in
+         macro_expand env result
+       | _ -> Pair (Symbol name, macro_expand env args)
+     with
+     | NotFound _ -> Pair (Symbol name, macro_expand env args))
+  | Pair (a, b) -> Pair (macro_expand env a, macro_expand env b)
+  | other -> other
+
+and subst names args template =
+  match names, args with
+  | [], [] -> template
+  | n :: ns, a :: args' ->
+    let template' = subst1 n a template in
+    subst ns args' template'
+  | _ -> raise (TypeError "macro arity mismatch")
+
+and subst1 name replacement = function
+  | Symbol s when s = name -> replacement
+  | Pair (a, b) -> Pair (subst1 name replacement a, subst1 name replacement b)
+  | other -> other
 
 let rec evalexp exp env =
   let evalapply f vs =
@@ -58,6 +111,11 @@ let evaldef def env =
 
 let rec eval ast env =
   match ast with Defexp d -> evaldef d env | e -> evalexp e env, env
+
+let eval_sexp sexp env =
+  let expanded = macro_expand env sexp in
+  let ast = build_ast expanded in
+  eval ast env
 
 let basis =
   let numprim name op =
@@ -146,6 +204,14 @@ let basis =
     | [ Map m; key; value ] -> Map ((key, value) :: m)
     | _ -> raise @@ TypeError "(assoc m key value)"
   in
+  let gensym_counter = ref 0 in
+  let prim_gensym = function
+    | [] ->
+      let n = !gensym_counter in
+      incr gensym_counter;
+      Symbol ("G_" ^ string_of_int n)
+    | _ -> raise (TypeError "(gensym)")
+  in
   let prim_stringp = function
     | [ String _ ] -> Boolean true
     | [ _ ] -> Boolean false
@@ -186,6 +252,7 @@ let basis =
     ; "map", prim_map
     ; "get", prim_get
     ; "assoc", prim_assoc
+    ; "gensym", prim_gensym
     ; "string?", prim_stringp
     ; "vector?", prim_vectorp
     ; "map?", prim_mapp

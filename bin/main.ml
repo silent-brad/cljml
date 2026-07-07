@@ -9,8 +9,7 @@ let rec repl stm env =
       Lwt.return ()
   in
   let* sexp = read_sexp stm in
-  let ast = build_ast sexp in
-  let result, env' = eval ast env in
+  let result, env' = Eval.eval_sexp sexp env in
   let* () =
     if stm.is_stdin then (
       print_endline (string_val result);

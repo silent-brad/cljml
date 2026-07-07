@@ -5,17 +5,11 @@ open Reader
 open Lwt.Syntax
 
 let stdlib =
-  let ev env e =
-    match e with
-    | Defexp d -> evaldef d env
-    | _ -> raise (TypeError "Can only have definitions in stdlib")
-  in
   let rec slurp stm env =
     Lwt.catch
       (fun () ->
          let* sexp = read_sexp stm in
-         let ast = build_ast sexp in
-         let env' = ev env ast |> snd in
+         let _, env' = eval_sexp sexp env in
          slurp stm env')
       (function End_of_file -> Lwt.return env | e -> Lwt.fail e)
   in

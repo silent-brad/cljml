@@ -28,6 +28,7 @@ type lobject =
   | Vector of lobject list
   | Map of (lobject * lobject) list
   | Keyword of string
+  | Macro of name list * lobject * value env
 
 and value = lobject
 and name = string

@@ -31,6 +31,7 @@ let rec string_val e =
         (List.map (fun (k, v) -> string_val k ^ " " ^ string_val v) m)
     ^ "}"
   | Keyword k -> ":" ^ k
+  | Macro _ -> "#<macro>"
 
 let spacesep ns = String.concat " " ns
 

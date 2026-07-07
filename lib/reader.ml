@@ -128,22 +128,34 @@ let rec read_sexp stm =
   else if is_symstartchar c then
     let* sym = read_symbol () in
     if c = ':' then
-      Lwt.return (Keyword sym)
+      Lwt.return @@ Keyword sym
     else
-      Lwt.return (Symbol (string_of_char c ^ sym))
+      Lwt.return @@ Symbol (string_of_char c ^ sym)
   else if c = '~' then
     let* nc = read_char stm in
     if is_digit nc || nc = '~' then
       read_fixnum ("-" ^ Char.escaped (if nc = '~' then '~' else nc))
     else (
       unread_char stm nc;
-      Lwt.return (Symbol (string_of_char c)))
+      Lwt.return @@ Symbol (string_of_char c))
+  else if c = '`' then
+    let* e = read_sexp stm in
+    Lwt.return @@ Pair (Symbol "quasiquote", Pair (e, Nil))
+  else if c = ',' then
+    let* nc = read_char stm in
+    if nc = '@' then
+      let* e = read_sexp stm in
+      Lwt.return @@ Pair (Symbol "unquote-splicing", Pair (e, Nil))
+    else (
+      unread_char stm nc;
+      let* e = read_sexp stm in
+      Lwt.return @@ Pair (Symbol "unquote", Pair (e, Nil)))
   else if c = '(' then
     let* elems = read_list stm ')' in
-    Lwt.return (List.fold_right (fun car cdr -> Pair (car, cdr)) elems Nil)
+    Lwt.return @@ List.fold_right (fun car cdr -> Pair (car, cdr)) elems Nil
   else if c = '[' then
     let* elems = read_list stm ']' in
-    Lwt.return (Vector elems)
+    Lwt.return @@ Vector elems
   else if c = '{' then
     read_map stm
   else if c = '"' then
