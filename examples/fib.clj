@@ -5,6 +5,6 @@
 (defn fib
   [n]
   (if (< n 2)
-    n
+    1
     (+ (fib (- n 1))
        (fib (- n 2)))))
